@@ -201,7 +201,7 @@ def split_text_into_chunks(text, model="gpt-3.5-turbo", chunk_size=150):
     return text_chunks
 
 
-def orchestate_graph_agents_evaluating(guide_input, text_input):
+def orchestate_graph_agents_evaluating(guide_input, text_input, language):
 
     llm, watsonx_embedding = set_up_watsonx()
     if llm == None or watsonx_embedding == None:
@@ -214,7 +214,7 @@ def orchestate_graph_agents_evaluating(guide_input, text_input):
     scores_embeddings = get_ollama_embedding(scores, watsonx_embedding)
      
     prompt_template = ChatPromptTemplate.from_messages(
-        [("system", f"You are an expert in the next script and document that is showing bellow: {guide_input} \n\n It shows the guidelines of how must be the behaviour and culture of the customer support workers. Based on that you are going to create a feedback like, 'The worker has addressed correctly the connversation', 'The worker is not following correctly the guidelines', 'The worker seems like it was not a worker from the company, is deficent' and so, about the fragment of text that the user provide, taking into account the behaviour of the agent or worker involved in the conversation and how many the worker does fit with the guide or items provided, regardless of whether or not it was possible to solve the problem. You must thing about how is the customer or client, and how is the agent or worker, and provide feedback just to what agent/worker say, and how is he handle the customer/client disposition"), ("user", "{chunk}")]
+        [("system", f"You are an expert in the next script and document that is showing bellow: {guide_input} \n\n It shows the guidelines of how must be the behaviour and culture of the customer support workers. Based on that you are going to create a feedback like, 'The worker has addressed correctly the connversation', 'The worker is not following correctly the guidelines', 'The worker seems like it was not a worker from the company, is deficent' and so, about the fragment of text that the user provide, taking into account the behaviour of the agent or worker involved in the conversation and how many the worker does fit with the guide or items provided, regardless of whether or not it was possible to solve the problem. You must thing about how is the customer or client, and how is the agent or worker, and provide feedback just to what agent/worker say, and how is he handle the customer/client disposition"), ("user", "a fragment of the conversation: \n{chunk}")]
     )
 
     scores_array = []
@@ -236,10 +236,18 @@ def orchestate_graph_agents_evaluating(guide_input, text_input):
             print(f"Error processing chunk {i+1}: {e}")
             continue
             
+    #provide feedback about the conversation compared with the guidelines
+    prompt_feedback = ChatPromptTemplate.from_messages(
+        [("system", f"You are an expert in the next script and document that is showing bellow: {guide_input} \n\n It shows the guidelines of how must be the behaviour and culture of the customer support workers. Based on that you are going to create a feedback like, 'The worker has addressed correctly the connversation', 'The worker is not following correctly the guidelines', 'The worker seems like it was not a worker from the company, is deficent' and so, about the fragment of text that the user provide, taking into account the behaviour of the agent or worker involved in the conversation and how many the worker does fit with the guide or items provided, regardless of whether or not it was possible to solve the problem. You must thing about how is the customer or client, and how is the agent or worker, and provide feedback just to what agent/worker say, and how is he handle the customer/client disposition. the feedback provided must be in language: {language}"), ("user", "give me a feedback of how was the worker or agent answering to the user, could it improve something based on the script or guidelines?. give me too an Overall rating between 0 and 4. \n conversation/transcription: {text_input}")]
+    )
+    feedback_prompt = prompt_feedback.invoke( {"text_input": text_input})
+    feedback_prompt.to_messages()
+    feedback = llm.invoke(feedback_prompt)
+
     #set average score
     print(scores_array)
     average = np.mean(scores_array)
-    return average
+    return average, feedback
 
 
 

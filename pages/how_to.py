@@ -20,8 +20,9 @@ def render_how_to():
     st.text_area("Guide", value=st.session_state.guide_input)
     st.text_area("Text", value=st.session_state.objective)
     if st.button("Evaluate"):
-        average=orchestate_graph_agents_evaluating(st.session_state.guide_input, st.session_state.objective)
-        st.write(f"The average score for providing to the user between 0-4 is: {average}")
+        average, feedback=orchestate_graph_agents_evaluating(st.session_state.guide_input, st.session_state.objective, st.session_state.language)
+        st.write(f"The average score for providing to the user between 0-4 is: {average} __ Embbended model analyser: it gets the average of analyse feedback provide each 150 tokens of the text, like a weighted rating.")
+        st.markdown(f"**Feedback: {feedback}")
 
 
 def main():
