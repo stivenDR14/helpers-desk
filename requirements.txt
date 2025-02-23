@@ -5,6 +5,7 @@ tiktoken
 requests
 python-dotenv
 streamlit
+pandas
 
 # LangChain and AI-related dependencies
 langchain
