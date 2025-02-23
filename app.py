@@ -1,4 +1,4 @@
-from services import orchestrate_agents
+from services import orchestrate_graph_agents
 import streamlit as st
 from utils import MAP_ROUTES, TRANSLATIONS, render_sidebar
 
@@ -67,14 +67,16 @@ def render_head():
     if st.button("Generate Solution"):
         st.write("### Configuration Summary")
         st.write(f"**Objective:** {st.session_state.objective}")
-        st.write("**Roles & Descriptions:**")
+        st.write("**Roles & Descriptions:**")   
+        for role in st.session_state.roles:
+            st.write(f"- **{role}:** {st.session_state.descriptions[st.session_state.roles.index(role)]}")
+        if len(st.session_state.report_formats) > 0:
+            st.write("**Report Formats:**", ", ".join(st.session_state.report_formats))
         st.session_state.submit_button_clicked = True
-        orchestrate_agents(st.session_state.roles, st.session_state.descriptions, st.session_state.report_formats, st.session_state.objective)
+        result = orchestrate_graph_agents(st.session_state.roles, st.session_state.descriptions, st.session_state.report_formats, st.session_state.objective, st.session_state.language)
+        st.markdown(result, unsafe_allow_html=True,)
 
-    for role in st.session_state.roles:
-        st.write(f"- **{role}:** {st.session_state.descriptions[st.session_state.roles.index(role)]}")
-    if len(st.session_state.report_formats) > 0:
-        st.write("**Report Formats:**", ", ".join(st.session_state.report_formats))
+ 
 
 def render_chat():
     st.write("### ")
