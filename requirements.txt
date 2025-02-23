@@ -1,11 +1,11 @@
 # Core dependencies
-numpy
+numpy==1.26.4
 torch
 tiktoken
 requests
 python-dotenv
 streamlit
-pandas
+pandas==2.1.4
 
 # LangChain and AI-related dependencies
 langchain
