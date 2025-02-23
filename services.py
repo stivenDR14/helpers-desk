@@ -31,8 +31,6 @@ load_dotenv()
 endpoint_watsonx = os.getenv('WATSONX_URL')
 api_key_watsonx = os.getenv('WATSONX_APIKEY')
 project_id_watsonx = os.getenv('WATSONX_PROJECT_ID')
-endpoint_mistralai = os.getenv('MISTRALAI_URL')
-api_key_mistralai = os.getenv('MISTRALAI_APIKEY')
 
 def set_up_watsonx():
     token_watsonx = authenticate_watsonx()
@@ -73,32 +71,6 @@ def set_up_watsonx():
         params=embed_params,
     ) 
 
-
-    """ watsonx_crew_llm = LLM(
-        model="watsonx/ibm/granite-13b-instruct-v2",
-        base_url= "https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2023-05-29",
-        api_key= api_key_watsonx,
-    ) """
-    """ watsonx_crew_llm = ChatMistralAI(
-        model="mistral-large-latest",
-        temperature=0.5,
-        max_tokens=2000,
-        mistral_api_key=api_key_mistralai,
-        endpoint=endpoint_mistralai
-    ) """
-
-    """ os.environ["AZURE_AI_API_KEY"] = api_key_mistralai
-    os.environ["AZURE_AI_API_BASE"] = endpoint_mistralai
-    watsonx_crew_llm = LLM(
-        model="azure_ai/mistral-large-latest",
-        base_url= endpoint_mistralai,
-        api_key= api_key_mistralai,
-    ) """
-    """ llm_aux = ChatOllama(
-        model = "llama3:8b",
-        temperature = 0.8,
-        num_predict = 256,
-    ) """
     return watsonx_llm  , watsonx_embedding
 
 def authenticate_watsonx():
