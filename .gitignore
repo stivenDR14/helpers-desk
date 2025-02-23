@@ -1,0 +1,22 @@
+
+# Ignore log files
+*.log
+
+# Ignore environment variable files
+.env
+
+#ignore py_cache
+__pycache__/
+
+# Ignore build directories
+dist/
+build/
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+*.iml
