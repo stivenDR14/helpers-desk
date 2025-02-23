@@ -1,24 +1,20 @@
-from crewai import Agent, Task, Crew, LLM, Process
 import os
-import re
-import json
+import numpy as np
 from dotenv import load_dotenv
 from langchain_ibm import WatsonxLLM
 from ibm_watsonx_ai import APIClient, Credentials
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_mistralai import ChatMistralAI
-from IPython.display import Markdown
-from utils import GENERAL_PROMPT
 import requests
 from langgraph.constants import Send, START, END
 from langgraph.graph import StateGraph
-from typing import TypedDict, Annotated, Literal
+from typing import TypedDict, Annotated
 import operator
-from pydantic import BaseModel, Field
 from langchain.schema import SystemMessage, HumanMessage
-from IPython.display import Image, Markdown
 from ibm_watsonx_ai.metanames import EmbedTextParamsMetaNames
 from langchain_ibm import WatsonxEmbeddings
+import torch
+from sentence_transformers.util import cos_sim
+import tiktoken
 
 
 """ import logging
@@ -70,6 +66,13 @@ def set_up_watsonx():
         watsonx_client=client,
         params = parameters
     )
+    watsonx_embedding = WatsonxEmbeddings(
+        model_id="ibm/granite-embedding-278m-multilingual",
+        url="https://us-south.ml.cloud.ibm.com",
+        project_id=project_id_watsonx,
+        params=embed_params,
+    ) 
+
 
     """ watsonx_crew_llm = LLM(
         model="watsonx/ibm/granite-13b-instruct-v2",
@@ -96,7 +99,7 @@ def set_up_watsonx():
         temperature = 0.8,
         num_predict = 256,
     ) """
-    return watsonx_llm
+    return watsonx_llm  , watsonx_embedding
 
 def authenticate_watsonx():
     url = "https://iam.cloud.ibm.com/identity/token"
@@ -121,9 +124,9 @@ def authenticate_watsonx():
 
 
 
-def orchestrate_graph_agents(roles, descriptions, report_formats, objective, language):
+def orchestrate_graph_agents(roles, descriptions,  objective, language):
 
-    llm= set_up_watsonx()
+    llm, watsonx_embedding = set_up_watsonx()
     if llm == None:
         print("Error setting up WatsonX")
         return
@@ -153,7 +156,7 @@ def orchestrate_graph_agents(roles, descriptions, report_formats, objective, lan
         """Each worker contributes based on its role"""
         role = state["role"]
         contribution = llm.invoke([
-            SystemMessage(content=f"You are a {role}. Contribute to the given objective taking into account the next behaviour and description that defines your role: {state['description']}. Based on that information, provide your criteria to fulfill what user is asking for."),
+            SystemMessage(content=f"You are a {role}. Contribute to the given objective taking into account the next behaviour and description that defines your role: {state['description']}. Based on that information, provide your criteria to fulfill what user is asking for. Answer alway to the user in the language: " + language),
             HumanMessage(content=f"Objective: {state['objective']}"),
         ])
         return {"contributions": [contribution]}
@@ -193,160 +196,78 @@ def orchestrate_graph_agents(roles, descriptions, report_formats, objective, lan
     return state["final_summary"]
     
 
-def orchestate_graph_agents_evaluating(roles, descriptions, report_formats, objective, language):
 
-    llm= set_up_watsonx()
-    if llm == None:
+def get_ollama_embedding(texts, model):
+    embeddings = []
+    for text in texts:
+        #response = ollama.embeddings(model=model, prompt=text)
+        response = model.embed_query(text)
+        embeddings.append(response)
+    
+    # Find the maximum length of the embeddings
+    max_length = max(len(embedding) for embedding in embeddings)
+    
+    # Pad all embeddings to the maximum length
+    padded_embeddings = [embedding + [0] * (max_length - len(embedding)) for embedding in embeddings]
+    
+    return torch.tensor(np.array(padded_embeddings), dtype=torch.float32)
+
+def split_text_into_chunks(text, model="gpt-3.5-turbo", chunk_size=100):
+    tokenizer = tiktoken.encoding_for_model(model)
+    tokens = tokenizer.encode(text)
+
+    # Split tokens into chunks of chunk_size
+    chunks = [tokens[i:i + chunk_size] for i in range(0, len(tokens), chunk_size)]
+
+    # Decode tokens back into text
+    text_chunks = [tokenizer.decode(chunk) for chunk in chunks]
+
+    return text_chunks
+
+
+def orchestate_graph_agents_evaluating(guide_input, text_input):
+
+    llm, watsonx_embedding = set_up_watsonx()
+    if llm == None or watsonx_embedding == None:
         print("Error setting up WatsonX")
         return
         
-    # Graph state
-    class State(TypedDict):
-        objective: str  # Shared objective
-        roles: list[str]  # Dynamic list of roles
-        accumulated_info: Annotated[list, operator.add]  # Information gathered
-        final_summary: str  # Final synthesized output
+    chunks = split_text_into_chunks(text_input)
+    scores=["very bad feedback", "bad feedback", "neutral feedback", "good feedback", "very good feedback"]
 
-    # Schema for structured evaluation output
-    class Feedback(BaseModel):
-        grade: Literal["accepted", "rejected"] = Field(
-            description="Decide if the contribution meets the objective or needs improvement.",
-        )
-        feedback: str = Field(
-            description="If rejected, provide feedback on how to improve it.",
-        )
-
-    # Augment LLM with structured evaluation output
-    evaluator = llm.with_structured_output(Feedback)
-
-    # Nodes
-    def generator(state: State):
-        """Generates an initial proposal for the given objective."""
-        proposal = llm.invoke([
-            SystemMessage(content="Generate an initial idea or approach for the given objective."),
-            HumanMessage(content=f"Objective: {state['objective']}"),
-        ])
-        return {"accumulated_info": [proposal]}
-
-    def role_evaluator(state: State):
-        """Each evaluator critically assesses the proposal."""
-        role = state["roles"].pop(0)  # Process roles one by one
-        evaluation = evaluator.invoke(f"Evaluate this contribution based on the objective: {state['accumulated_info'][-1]}\nRole: {role}")
-        return {"grade": evaluation.grade, "feedback": evaluation.feedback}
-
-    def synthesizer(state: State):
-        """Synthesizes the final report from all accumulated insights."""
-        summary = "\n\n---\n\n".join(state["accumulated_info"])
-        return {"final_summary": summary}
-
-    def route_feedback(state: State):
-        """Decide whether to iterate or finalize based on evaluation."""
-        if state["grade"] == "accepted" or not state["roles"]:
-            return "Accepted"
-        else:
-            return "Rejected + Feedback"
-
-    def update_generator(state: State):
-        """Updates the proposal based on evaluator feedback."""
-        updated_proposal = llm.invoke([
-            SystemMessage(content="Refine the proposal based on the given feedback."),
-            HumanMessage(content=f"Feedback: {state['feedback']}\nPrevious proposal: {state['accumulated_info'][-1]}"),
-        ])
-        return {"accumulated_info": state["accumulated_info"] + [updated_proposal]}
-
-    # Build workflow
-    workflow_builder = StateGraph(State)
-
-    # Add nodes
-    workflow_builder.add_node("generator", generator)
-    workflow_builder.add_node("role_evaluator", role_evaluator)
-    workflow_builder.add_node("update_generator", update_generator)
-    workflow_builder.add_node("synthesizer", synthesizer)
-
-    # Add edges
-    workflow_builder.add_edge(START, "generator")
-    workflow_builder.add_edge("generator", "role_evaluator")
-    workflow_builder.add_conditional_edges("role_evaluator", route_feedback, {
-        "Accepted": "synthesizer",
-        "Rejected + Feedback": "update_generator",
-    })
-    workflow_builder.add_edge("update_generator", "role_evaluator")
-    workflow_builder.add_edge("synthesizer", END)
-
-    # Compile workflow
-    workflow = workflow_builder.compile()
-
-    # Invoke in Streamlit
-    state = workflow.invoke({
-        "objective": "Develop a comprehensive AI ethics framework",
-        "roles": ["Researcher", "Philosopher", "Engineer", "Lawyer", "Product Manager"]
-    })
-
-    return state["final_summary"]
-
-""" 
-def orchestrate_agents(roles, descriptions, report_formats, objective):
-    watsonx_llm, watsonx_crew_llm = set_up_watsonx()
-    if watsonx_llm == None:
-        print("Error setting up WatsonX")
-        return
-    system_template = GENERAL_PROMPT
-
+    scores_embeddings = get_ollama_embedding(scores, watsonx_embedding)
+     
     prompt_template = ChatPromptTemplate.from_messages(
-        [("system", system_template), ("user", "{text}")]
+        [("system", f"You are an expert in the next guide, items and/or script that is showing bellow: {guide_input} \n\n Based on that you are going to create a feedback about the fragment of text that the user provide, taking into account the behaviour of the agent or worker involved in the conversation and how many it makes fit with the guide or items provided"), ("user", "{chunk}")]
     )
-    agents_array = []
-    tasks_array = []
-    json_array = []
-    
-    for cont, individual_role in enumerate(roles):  
+
+    scores_array = []
+    for i, chunk in enumerate(chunks):
+        print(f"Chunk {i+1}:\n{chunk}\n")
+        
         try:
-            concatenated_role= f"Role: {individual_role}. Description/behaviour:{descriptions[cont]}. Objective: {objective}"
-            prompt = prompt_template.invoke({"text": concatenated_role})
+            prompt = prompt_template.invoke({"chunk": chunk})
             prompt.to_messages()
 
-            response = watsonx_llm.invoke(prompt)
-            match = re.search(r'\{.*?\}', response)
-            print(response)
-            
-            if match:
-                json_content = match.group(0)
-                try:
-                    json_data = json.loads(json_content)
-                    json_array.append(json_data)
-                    current_agent = Agent(
-                        llm = watsonx_crew_llm,
-                        role=json_data["role"],
-                        goal=json_data["goal"],
-                        backstory=json_data["backstory"]
-                    )
-                    agents_array.append(current_agent)
-                    tasks_array.append(Task(
-                        description=json_data["tasks_description"],
-                        expected_output=json_data["tasks_expected_output"],
-                        agent= current_agent
-                    ))
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {e}")
+            feedback = llm.invoke(prompt)
+            feedback_embedding = get_ollama_embedding([feedback], watsonx_embedding)
+            similarity_scores = cos_sim(scores_embeddings, feedback_embedding)
+            how_good = scores[similarity_scores.argmax()]
+            #index of scores
+            index = scores.index(how_good)
+            scores_array.append(index)
         except Exception as e:
-            print(f"Error orchestrating agent: {e}")
+            print(f"Error processing chunk {i+1}: {e}")
             continue
-        
-        
-    print("Agents orchestrated successfully!")
-    print(json_array)
+            
+    #set average score
+    print(scores_array)
+    average = np.mean(scores_array)
+    return average
 
-    agents_crew = Crew(
-        agents=agents_array, 
-        tasks=tasks_array, 
-        process=Process.hierarchical,
-        manager_llm=watsonx_crew_llm,
-        verbose=True 
-    )
 
-    result = agents_crew.kickoff(inputs={'input': objective})
-    print(result)
-    
-    print("Agents orchestrated successfully!")
-    
- """
+
+
+            
+
+
