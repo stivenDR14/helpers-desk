@@ -21,7 +21,7 @@ def render_how_to():
     st.text_area("Text", value=st.session_state.objective)
     if st.button("Evaluate"):
         average=orchestate_graph_agents_evaluating(st.session_state.guide_input, st.session_state.objective)
-        st.write(f"Average between 0-4: {average}")
+        st.write(f"The average score for providing to the user between 0-4 is: {average}")
 
 
 def main():

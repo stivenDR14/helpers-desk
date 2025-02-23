@@ -12,7 +12,7 @@ def render_sidebar(current_page):
         st.title(TRANSLATIONS[st.session_state.language]["navegation"])
         if st.button(("✅ " if current_page == "home" else "") + TRANSLATIONS[st.session_state.language]["page_title_helpers"]+" 👾"):
             st.switch_page("app.py")
-        if st.button(("✅ " if current_page == "how_to" else "") + TRANSLATIONS[st.session_state.language]["page_title_how_to"]+" 🤔"):
+        if st.button(("✅ " if current_page == "qa_cx" else "") + TRANSLATIONS[st.session_state.language]["page_title_how_to"]+" 🤔"):
             st.switch_page("pages/how_to.py")
         if st.button(("✅ " if current_page == "use_cases" else "") + TRANSLATIONS[st.session_state.language]["page_title_use_cases"]+" ☑️"):
             st.switch_page("pages/use_cases.py")
@@ -33,7 +33,7 @@ def render_sidebar(current_page):
 
 MAP_ROUTES = {
     "home": "home",
-    "how_to": "how_to",
+    "how_to": "qa_cx",
     "use_cases": "use_cases",
 }
 
@@ -44,7 +44,7 @@ TRANSLATIONS = {
         "navegation": "Options",
         "language": "Language",
         "page_title_helpers": "Helpers Desk",
-        "page_title_use_cases": "use_cases",
+        "page_title_use_cases": "Use cases",
         "page_title_how_to": "QA Help Desk CX",
         "help_option": "Help Desk Options",
         "chat": "Chat",
@@ -56,7 +56,7 @@ TRANSLATIONS = {
         "navegation": "Options",
         "language": "Language",
         "page_title_helpers": "Helpers Desk",
-        "page_title_use_cases": "use_cases",
+        "page_title_use_cases": "Use cases",
         "page_title_how_to": "QA Help Desk CX",
         "help_option": "Help Desk Options",
         "chat": "Chat",
@@ -68,7 +68,7 @@ TRANSLATIONS = {
         "navegation": "Options",
         "language": "Language",
         "page_title_helpers": "Helpers Desk",
-        "page_title_use_cases": "use_cases",
+        "page_title_use_cases": "Use cases",
         "page_title_how_to": "QA Help Desk CX",
         "help_option": "Help Desk Options",
         "chat": "Chat",
@@ -81,7 +81,7 @@ TRANSLATIONS = {
         "navegation": "Options",
         "language": "Language",
         "page_title_helpers": "Helpers Desk",
-        "page_title_use_cases": "use_cases",
+        "page_title_use_cases": "Use cases",
         "page_title_how_to": "QA Help Desk CX",
         "help_option": "Help Desk Options",
         "chat": "Chat",
@@ -94,7 +94,7 @@ TRANSLATIONS = {
         "navegation": "Options",
         "language": "Language",
         "page_title_helpers": "Helpers Desk",
-        "page_title_use_cases": "use_cases",
+        "page_title_use_cases": "Use cases",
         "page_title_how_to": "QA Help Desk CX",
         "help_option": "Help Desk Options",
         "chat": "Chat",

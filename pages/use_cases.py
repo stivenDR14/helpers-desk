@@ -153,7 +153,6 @@ def customer_support_qa_success_validation():
     st.session_state.descriptions = []
     
     st.session_state.objective = """
-    **Extended Simulation of a Successful Conversation**
 
     **Agent:** Good morning, welcome to [Company Name] customer support. My name is Carlos. How can I assist you today?
 
@@ -207,7 +206,6 @@ def customer_support_qa_humdrum_validation():
     st.session_state.descriptions = []
     
     st.session_state.objective = """"
-    **Extended Simulation of a Challenging Conversation**
 
     **Agent:** Good morning, welcome to [Company Name] customer support. My name is Lisa. How can I assist you today?
 
@@ -249,7 +247,6 @@ def customer_support_qa_wrong_validation():
     st.session_state.roles = []
     st.session_state.descriptions = []
     st.session_state.objective = """
-    Extended Simulation of a Difficult and Unresolved Conversation
 
     Agent: Good afternoon, this is Mike from [Company Name] customer support. How can I assist you today?
 

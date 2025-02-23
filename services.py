@@ -128,7 +128,7 @@ def orchestrate_graph_agents(roles, descriptions,  objective, language):
         """Each worker contributes based on its role"""
         role = state["role"]
         contribution = llm.invoke([
-            SystemMessage(content=f"You are a {role}. Contribute to the given objective taking into account the next behaviour and description that defines your role: {state['description']}. Based on that information, provide your criteria to fulfill what user is asking for. Answer alway to the user in the language: " + language),
+            SystemMessage(content=f"You are a helpfully {role}. Contribute to the given objective taking into account the next behaviour and description that defines your role: {state['description']}. Your conrtributions mustn't be with questions, since your position and role, you will try to solve that in the best way. Based on that information, provide your criteria to fulfill what user is asking for. You must answer always to the user in the language: " + language),
             HumanMessage(content=f"Objective: {state['objective']}"),
         ])
         return {"contributions": [contribution]}
@@ -136,7 +136,11 @@ def orchestrate_graph_agents(roles, descriptions,  objective, language):
     def synthesizer(state: State):
         """Synthesizes final output from contributions"""
         summary = "\n\n---\n\n".join(state["contributions"])
-        return {"final_summary": summary}
+        conclusion = llm.invoke([
+            SystemMessage(content=f"You are a helpfully AI that is going to provide a solution to the user based on the contributions of the roles, taking into account the most relevant information provided by each section, not just the last one part. Remember the objective that you will enfatize {state['objective']}. You must answer with concise information, roudmap, guidelines, list of items and so, but never answer with questions. You must answer always to the user in the language: " + language),
+            HumanMessage(content=f"This is the text that you must organize and bastract the main ideas and guidelines: {summary}"),
+        ])
+        return {"final_summary": summary + "\n\n🔽------*****------🔽\n\n" + conclusion}
 
     def assign_workers(state: State):
         """Dynamically assigns workers based on roles"""
@@ -184,7 +188,7 @@ def get_ollama_embedding(texts, model):
     
     return torch.tensor(np.array(padded_embeddings), dtype=torch.float32)
 
-def split_text_into_chunks(text, model="gpt-3.5-turbo", chunk_size=100):
+def split_text_into_chunks(text, model="gpt-3.5-turbo", chunk_size=150):
     tokenizer = tiktoken.encoding_for_model(model)
     tokens = tokenizer.encode(text)
 
@@ -210,7 +214,7 @@ def orchestate_graph_agents_evaluating(guide_input, text_input):
     scores_embeddings = get_ollama_embedding(scores, watsonx_embedding)
      
     prompt_template = ChatPromptTemplate.from_messages(
-        [("system", f"You are an expert in the next guide, items and/or script that is showing bellow: {guide_input} \n\n Based on that you are going to create a feedback about the fragment of text that the user provide, taking into account the behaviour of the agent or worker involved in the conversation and how many it makes fit with the guide or items provided"), ("user", "{chunk}")]
+        [("system", f"You are an expert in the next script and document that is showing bellow: {guide_input} \n\n It shows the guidelines of how must be the behaviour and culture of the customer support workers. Based on that you are going to create a feedback like, 'The worker has addressed correctly the connversation', 'The worker is not following correctly the guidelines', 'The worker seems like it was not a worker from the company, is deficent' and so, about the fragment of text that the user provide, taking into account the behaviour of the agent or worker involved in the conversation and how many the worker does fit with the guide or items provided, regardless of whether or not it was possible to solve the problem. You must thing about how is the customer or client, and how is the agent or worker, and provide feedback just to what agent/worker say, and how is he handle the customer/client disposition"), ("user", "{chunk}")]
     )
 
     scores_array = []
